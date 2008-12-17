@@ -74,7 +74,8 @@
             loadtext   : 'Loading...',
             placeholder: 'Click to edit',
             loaddata   : {},
-            submitdata : {}
+            submitdata : {},
+            disabler   : null
         };
         
         if(options) {
@@ -100,7 +101,7 @@
         if  (!$.isFunction($(this)[settings.event])) {
             $.fn[settings.event] = function(fn){
                 return fn ? this.bind(settings.event, fn) : this.trigger(settings.event);
-            }
+            };
         }
           
         /* show tooltip */
@@ -125,6 +126,18 @@
             }
             
             $(this)[settings.event](function(e) {
+                
+                // this is a possible way how to temporarily disable editable functionality
+                // TODO: I wish I have $.fn.editable("destroy")
+                if (settings.disabler) {
+                    if (typeof settings.disabler == "string") {
+                        if ($(self).hasClass(settings.disabler)) return; // disabled by class name
+                    } else if ($.isFunction(settings.disabler)) {
+                        if (settings.disabler.call(self, e)) return; // disabled by function
+                    } else {
+                        console.warning('unknown disabler type', settings.disabler);
+                    }
+                }
 
                 /* prevent throwing an exeption if edit field is clicked again */
                 if (self.editing) {
@@ -360,7 +373,7 @@
                         $(self).attr('title', settings.tooltip);                
                     }                    
                 }
-            }            
+            };
         });
 
     };

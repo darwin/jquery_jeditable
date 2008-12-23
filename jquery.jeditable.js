@@ -12,6 +12,8 @@
  * Based on editable by Dylan Verheul <dylan_at_dyve.net>:
  *    http://www.dyve.net/jquery/?editable
  *
+ * Added editing, resetting and submitting event hooks -- Brandon Aaron <brandon.aaron_at_gmail.com>
+ *
  * Revision: $Id$
  *
  */
@@ -56,6 +58,14 @@
   * @param Function options[onerror]  function(settings, original, xhr) { ... } called on error
   *             
   * @param Hash    options[ajaxoptions]  jQuery Ajax options. See docs.jquery.com.
+  *
+  *
+  * There are also three events that you can bind to:
+  *   .bind('editing.jeditable', fn)
+  *   .bind('submitting.jeditable', fn)
+  *   .bind('resetting.jeditable', fn)
+  *
+  * Each event handler receives the event as the first param and the settings object as the second param.
   *             
   */
 
@@ -134,7 +144,9 @@
                 if (self.editing) {
                     return;
                 }
-
+                
+                $(self).trigger('editing.jeditable', [settings]); // trigger editing event
+                
                 /* remove tooltip */
                 $(self).removeAttr('title');
                 
@@ -298,7 +310,9 @@
                         /* custom inputs call before submit hook. */
                         /* if it returns false abort submitting */
                         if (false !== submit.apply(form, [settings, self])) { 
-
+                          
+                          $(self).trigger('submitting.jeditable', [settings]); // trigger submit event
+                          
                           /* check if given target is function */
                           if ($.isFunction(settings.target)) {
                               var str = settings.target.apply(self, [input.val(), settings]);
@@ -367,7 +381,8 @@
                 /* prevent calling reset twice when blurring */
                 if (this.editing) {
                     /* before reset hook, if it returns false abort reseting */
-                    if (false !== onreset.apply(form, [settings, self])) { 
+                    if (false !== onreset.apply(form, [settings, self])) {
+                        $(self).trigger('resetting.jeditable', [settings]); // trigger reset event
                         $(self).html(self.revert);
                         self.editing   = false;
                         if (!$.trim($(self).html())) {

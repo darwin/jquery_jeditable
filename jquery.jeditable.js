@@ -12,6 +12,8 @@
  * Based on editable by Dylan Verheul <dylan_at_dyve.net>:
  *    http://www.dyve.net/jquery/?editable
  *
+ * Added editing, resetting and submitting event hooks -- Brandon Aaron <brandon.aaron_at_gmail.com>
+ *
  * Revision: $Id$
  *
  */
@@ -51,9 +53,19 @@
   * @param String  options[placeholder] Placeholder text or html to insert when element is empty. **
   * @param String  options[onblur]    'cancel', 'submit', 'ignore' or function ??
   *             
-  * TODO @param Function options[onsubmit]
-  * TODO @param Function options[onreset]
-  * TODO @param Function options[onerror]
+  * @param Function options[onsubmit] function(settings, original) { ... } called before submit
+  * @param Function options[onreset]  function(settings, original) { ... } called before reset
+  * @param Function options[onerror]  function(settings, original, xhr) { ... } called on error
+  *             
+  * @param Hash    options[ajaxoptions]  jQuery Ajax options. See docs.jquery.com.
+  *
+  *
+  * There are also three events that you can bind to:
+  *   .bind('editing.jeditable', fn)
+  *   .bind('submitting.jeditable', fn)
+  *   .bind('resetting.jeditable', fn)
+  *
+  * Each event handler receives the event as the first param and the settings object as the second param.
   *             
   */
 
@@ -75,7 +87,8 @@
             placeholder: 'Click to edit',
             loaddata   : {},
             submitdata : {},
-            disabler   : null
+            disabler   : null,
+            ajaxoptions: {}
         };
         
         if(options) {
@@ -96,6 +109,7 @@
         var callback = settings.callback || function() { };
         var onsubmit = settings.onsubmit || function() { };
         var onreset  = settings.onreset  || function() { };
+        var onerror  = settings.onerror  || reset;
         
         /* add custom event if it does not exist */
         if  (!$.isFunction($(this)[settings.event])) {
@@ -111,7 +125,7 @@
         settings.autoheight = 'auto' == settings.height;
 
         return this.each(function() {
-
+                        
             /* save this to self because this changes when scope changes */
             var self = this;  
                    
@@ -143,7 +157,9 @@
                 if (self.editing) {
                     return;
                 }
-
+                
+                $(self).trigger('editing.jeditable', [settings]); // trigger editing event
+                
                 /* remove tooltip */
                 $(self).removeAttr('title');
                 
@@ -176,7 +192,7 @@
                 $(self).html('');
 
                 /* create the form object */
-                var form = $('<form/>');
+                var form = $('<form />');
                 
                 /* apply css or style or both */
                 if (settings.cssclass) {
@@ -307,7 +323,9 @@
                         /* custom inputs call before submit hook. */
                         /* if it returns false abort submitting */
                         if (false !== submit.apply(form, [settings, self])) { 
-
+                          
+                          $(self).trigger('submitting.jeditable', [settings]); // trigger submit event
+                          
                           /* check if given target is function */
                           if ($.isFunction(settings.target)) {
                               var str = settings.target.apply(self, [input.val(), settings]);
@@ -337,17 +355,30 @@
 
                               /* show the saving indicator */
                               $(self).html(settings.indicator);
-                              $.post(settings.target, submitdata, function(str) {
-                                  $(self).html(str);
-                                  self.editing = false;
-                                  callback.apply(self, [self.innerHTML, settings]);
-                                  /* TODO: this is not dry */                              
-                                  if (!$.trim($(self).html())) {
-                                      $(self).html(settings.placeholder);
+                              
+                              /* defaults for ajaxoptions */
+                              var ajaxoptions = {
+                                  type    : 'POST',
+                                  data    : submitdata,
+                                  url     : settings.target,
+                                  success : function(result, status) {
+                                      $(self).html(result);
+                                      self.editing = false;
+                                      callback.apply(self, [self.innerHTML, settings]);
+                                      if (!$.trim($(self).html())) {
+                                          $(self).html(settings.placeholder);
+                                      }
+                                  },
+                                  error   : function(xhr, status, error) {
+                                      onerror.apply(form, [settings, self, xhr]);
                                   }
-                              });
-                          }
-
+                              }
+                              
+                              /* override with what is given in settings.ajaxoptions */
+                              $.extend(ajaxoptions, settings.ajaxoptions);   
+                              $.ajax(ajaxoptions);          
+                              
+                            }
                         }
                     }
                     
@@ -363,7 +394,8 @@
                 /* prevent calling reset twice when blurring */
                 if (this.editing) {
                     /* before reset hook, if it returns false abort reseting */
-                    if (false !== onreset.apply(form, [settings, self])) { 
+                    if (false !== onreset.apply(form, [settings, self])) {
+                        $(self).trigger('resetting.jeditable', [settings]); // trigger reset event
                         $(self).html(self.revert);
                         self.editing   = false;
                         if (!$.trim($(self).html())) {

@@ -23,7 +23,7 @@
   *
   * @name  Jeditable
   * @type  jQuery
-  * @param String  target             (POST) URL or function to send edited content to **
+  * @param Mixed   target             (POST) URL or function to send edited content to **
   * @param Hash    options            additional options 
   * @param String  options[method]    method to use to send edited content (POST or PUT) **
   * @param Function options[callback] Function to run after submitting edited content **
@@ -104,7 +104,7 @@
         if  (!$.isFunction($(this)[settings.event])) {
             $.fn[settings.event] = function(fn){
                 return fn ? this.bind(settings.event, fn) : this.trigger(settings.event);
-            }
+            };
         }
           
         /* show tooltip */
@@ -313,7 +313,6 @@
                               /* add edited content and id of edited element to POST */
                               var submitdata = {};
                               submitdata[settings.name] = input.val();
-                              submitdata[settings.id] = self.id;
                               /* add extra data to be POST:ed */
                               if ($.isFunction(settings.submitdata)) {
                                   $.extend(submitdata, settings.submitdata.apply(self, [self.revert, settings]));
@@ -325,7 +324,25 @@
                               if ('PUT' == settings.method) {
                                   submitdata['_method'] = 'put';
                               }
-
+                              
+                              if (typeof target == 'function') {
+                                var url = target.apply(self, [self.id, settings.id]);
+                              } else if ((typeof target == 'object') && (target instanceof Template)) {
+                                if (settings.id_regex_remove) {
+                                  var new_id = self.id.replace(settings.id_regex_remove, '');
+                                  var uri_context = {};
+                                  uri_context[settings.id] = new_id;
+                                  var url = target.expand(uri_context);
+                                } else {
+                                  var uri_context = {};
+                                  uri_context[settings.id] = self.id;
+                                  var url = target.expand(uri_context);
+                                }
+                              } else {
+                                submitdata[settings.id] = self.id;
+                                var url = target;
+                              }
+                              
                               /* show the saving indicator */
                               $(self).html(settings.indicator);
                               
@@ -333,7 +350,7 @@
                               var ajaxoptions = {
                                   type    : 'POST',
                                   data    : submitdata,
-                                  url     : settings.target,
+                                  url     : url,
                                   success : function(result, status) {
                                       $(self).html(result);
                                       self.editing = false;
@@ -345,7 +362,7 @@
                                   error   : function(xhr, status, error) {
                                       onerror.apply(form, [settings, self, xhr]);
                                   }
-                              }
+                              };
                               
                               /* override with what is given in settings.ajaxoptions */
                               $.extend(ajaxoptions, settings.ajaxoptions);   
@@ -377,7 +394,7 @@
                         $(self).attr('title', settings.tooltip);                
                     }                    
                 }
-            }            
+            };            
         });
 
     };

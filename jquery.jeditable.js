@@ -1,7 +1,7 @@
 /*
  * Jeditable - jQuery in place edit plugin
  *
- * Copyright (c) 2006-2008 Mika Tuupola, Dylan Verheul
+ * Copyright (c) 2006-2009 Mika Tuupola, Dylan Verheul
  *
  * Licensed under the MIT license:
  *   http://www.opensource.org/licenses/mit-license.php
@@ -12,14 +12,17 @@
  * Based on editable by Dylan Verheul <dylan_at_dyve.net>:
  *    http://www.dyve.net/jquery/?editable
  *
+<<<<<<< HEAD:jquery.jeditable.js
  * Added editing, resetting and submitting event hooks -- Brandon Aaron <brandon.aaron_at_gmail.com>
  *
  * Revision: $Id$
  *
+=======
+>>>>>>> tuupola/master:jquery.jeditable.js
  */
 
 /**
-  * Version 1.6.2-rc2
+  * Version 1.6.3-dev
   *
   * ** means there is basic unit tests for this parameter. 
   *
@@ -40,8 +43,8 @@
   * @param String  options[loadurl]   URL to fetch input content before editing **
   * @param String  options[loadtype]  Request type for load url. Should be GET or POST.
   * @param String  options[loadtext]  Text to display while loading external content.
-  * @param Hash    options[loaddata]  Extra parameters to pass when fetching content before editing.
-  * @param String  options[data]      Or content given as paramameter. **
+  * @param Mixed   options[loaddata]  Extra parameters to pass when fetching content before editing.
+  * @param Mixed   options[data]      Or content given as paramameter. String or function.**
   * @param String  options[indicator] indicator html to show when saving
   * @param String  options[tooltip]   optional tooltip text via title attribute **
   * @param String  options[event]     jQuery event such as 'click' of 'dblclick' **
@@ -107,19 +110,15 @@
         var reset    = $.editable.types[settings.type].reset 
                     || $.editable.types['defaults'].reset;
         var callback = settings.callback || function() { };
+        var onedit   = settings.onedit   || function() { }; 
         var onsubmit = settings.onsubmit || function() { };
         var onreset  = settings.onreset  || function() { };
         var onerror  = settings.onerror  || reset;
-        
-        /* add custom event if it does not exist */
-        if  (!$.isFunction($(this)[settings.event])) {
-            $.fn[settings.event] = function(fn){
-                return fn ? this.bind(settings.event, fn) : this.trigger(settings.event);
-            };
-        }
           
         /* show tooltip */
-        $(this).attr('title', settings.tooltip);
+        if (settings.tooltip) {
+            $(this).attr('title', settings.tooltip);
+        }
         
         settings.autowidth  = 'auto' == settings.width;
         settings.autoheight = 'auto' == settings.height;
@@ -158,10 +157,15 @@
                     return;
                 }
                 
-                $(self).trigger('editing.jeditable', [settings]); // trigger editing event
+                /* abort if onedit hook returns false */
+                if (false === onedit.apply(this, [settings, self])) {
+                   return;
+                }
                 
                 /* remove tooltip */
-                $(self).removeAttr('title');
+                if (settings.tooltip) {
+                    $(self).removeAttr('title');
+                }
                 
                 /* figure out how wide and tall we are, saved width and height */
                 /* are workaround for http://dev.jquery.com/ticket/2190 */
@@ -372,7 +376,7 @@
                                   error   : function(xhr, status, error) {
                                       onerror.apply(form, [settings, self, xhr]);
                                   }
-                              }
+                              };
                               
                               /* override with what is given in settings.ajaxoptions */
                               $.extend(ajaxoptions, settings.ajaxoptions);   
@@ -402,7 +406,9 @@
                             $(self).html(settings.placeholder);
                         }
                         /* show tooltip again */
-                        $(self).attr('title', settings.tooltip);                
+                        if (settings.tooltip) {
+                            $(self).attr('title', settings.tooltip);                
+                        }
                     }                    
                 }
             };
@@ -483,12 +489,12 @@
                     var textarea = $('<textarea />');
                     if (settings.rows) {
                         textarea.attr('rows', settings.rows);
-                    } else {
+                    } else if (settings.height != "none") {
                         textarea.height(settings.height);
                     }
                     if (settings.cols) {
                         textarea.attr('cols', settings.cols);
-                    } else {
+                    } else if (settings.width != "none") {
                         textarea.width(settings.width);
                     }
                     $(this).append(textarea);
@@ -501,20 +507,24 @@
                     $(this).append(select);
                     return(select);
                 },
-                content : function(string, settings, original) {
-                    if (String == string.constructor) {      
-                        eval ('var json = ' + string);
-                        for (var key in json) {
-                            if (!json.hasOwnProperty(key)) {
-                                continue;
-                            }
-                            if ('selected' == key) {
-                                continue;
-                            } 
-                            var option = $('<option />').val(key).append(json[key]);
-                            $('select', this).append(option);    
-                        }
+                content : function(data, settings, original) {
+                    /* If it is string assume it is json. */
+                    if (String == data.constructor) {      
+                        eval ('var json = ' + data);
+                    } else {
+                    /* Otherwise assume it is a hash already. */
+                        var json = data;
                     }
+                    for (var key in json) {
+                        if (!json.hasOwnProperty(key)) {
+                            continue;
+                        }
+                        if ('selected' == key) {
+                            continue;
+                        } 
+                        var option = $('<option />').val(key).append(json[key]);
+                        $('select', this).append(option);    
+                    }                    
                     /* Loop option again to set selected. IE needed this... */ 
                     $('select', this).children().each(function() {
                         if ($(this).val() == json['selected'] || 
